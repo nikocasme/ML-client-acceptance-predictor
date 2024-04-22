@@ -1,0 +1,97 @@
+import pandas as pd
+from google.colab import files 
+import io
+import warnings 
+import numpy as np 
+import seaborn as sns 
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+import datetime
+
+# Function to load data from Excel file
+def load_data(file_name):
+    uploaded = files.upload()
+    return pd.read_excel(io.BytesIO(uploaded[file_name]))
+
+# Function to handle missing values
+def handle_missing_values(df):
+    df['Banco'].fillna('Null', inplace=True)
+
+# Function to perform EDA
+def perform_eda(df):
+    # Display info
+    print(df.info())
+    
+    # Describe columns
+    for col in ['Nombre', 'Apellido', 'Identificacion', 'Codigo producto', 
+                'ValorCuota', 'ValorTransacción', 'ValorTotalTransacción',
+                'Banco', 'Vencimiento', 'Codigo Prefijo', 'Numero', 'Dia pago', 'DiasMora']:
+        print(df[col].describe())
+    
+    # Value counts of 'DiasMora'
+    print(df["DiasMora"].value_counts())
+    
+    # Correlation analysis
+    num_cols = df.select_dtypes(include=['float64', 'int64'])
+    corr_matrix = num_cols.corr()
+    plt.figure(figsize=(14, 12))
+    sns.heatmap(corr_matrix, cmap=plt.cm.RdYlBu_r, vmin=-0.25, annot=True, vmax=0.6)
+    plt.title('Correlation Matrix')
+    plt.show()
+    
+    # Pairplot for numeric columns
+    sns.pairplot(num_cols, x_vars=num_cols.columns, y_vars=['DiasMora'])
+    plt.show()
+    
+    # Distribution plot for 'DiasMora'
+    sns.distplot(df['DiasMora'])
+    plt.title('Distribution of DiasMora')
+    plt.show()
+    
+    # Boxplot for 'DiasMora'
+    sns.boxplot(x=df['DiasMora'])
+    plt.title('Boxplot of DiasMora')
+    plt.show()
+
+# Function to handle datetime columns
+def handle_datetime(df, column):
+    df[column] = pd.to_datetime(df[column])
+
+# Function to create train and test datasets
+def create_train_test(df):
+    test_data = df[df.Apellido.isnull()].reset_index(drop=True)
+    x_test = test_data.drop(columns=['DiasMora'])
+    y_test = test_data["DiasMora"]
+
+    train_data = df[df.Vencimiento.notnull()].reset_index(drop=True)
+    handle_datetime(train_data, 'Vencimiento')
+    last_date = train_data['Vencimiento'].iloc[-1] - pd.DateOffset(days=15)
+    last_index = train_data[train_data['Vencimiento'] <= last_date].index[-1]
+    val2 = train_data.iloc[last_index+1:, :].copy().reset_index(drop=True)
+    train_data = train_data.iloc[:last_index+1, :].copy().reset_index(drop=True)
+    
+    return train_data, val2, x_test, y_test
+
+# Main function
+def main():
+    # Load data
+    df = load_data('AAA.xlsx')
+    
+    # Handle missing values
+    handle_missing_values(df)
+    
+    # Perform EDA
+    perform_eda(df)
+    
+    # Create train and test datasets
+    train_data, val2, x_test, y_test = create_train_test(df)
+    
+    # Display information
+    print("Train data info:")
+    print(train_data.info())
+    print("\nValue counts of Identificacion:")
+    print(train_data['Identificacion'].value_counts())
+    sns.countplot(x=train_data['Identificacion'])
+
+if __name__ == "__main__":
+    main()
